@@ -5,4 +5,4 @@
 
 ## Usage
 Include `libwgpu.js` in an HTML file.
-`libwgpu.js` contains JSDoc documentation on how to use this library.
+`libwgpu.js` contains JSDoc documentation on how to use this library. The examples also show how to use this library.
