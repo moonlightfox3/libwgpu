@@ -1,18 +1,33 @@
+/**
+ * libwgpu library main
+ * @class
+ */
 class libwgpu {
-    device = null
-    shaderModule = null
-    canvas = null
-    ctx = null
+    device = null /** @type {GPUDevice} */
+    shaderModule = null /** @type {GPUShaderModule} */
+    canvas = null /** @type {(HTMLCanvasElement|null)} */
+    ctx = null /** @type {(GPUCanvasContext|null)} */
 
-    bindGroupLayoutList = null
-    mainPipeline = null
+    bindGroupLayoutList = null /** @type {Array} */
+    mainPipeline = null /** @type {(GPURenderPipeline|GPUComputePipeline)} */
 
+    /**
+     * Constructor for a new libwgpu instance
+     * @constructor
+     * @param {string} shaders - The WGSL shaders to use (as a string)
+     * @param {(HTMLCanvasElement|null)} canvas - The HTMLCanvasElement to render to (if rendering), or null (if computing)
+     */
     constructor (shaders = "", canvas = null) {
         this.shaders = shaders
         this.canvas = canvas
     }
+    /**
+     * Initializes this libwgpu instance for rendering (should only be called once)
+     * @param {boolean} enableExtraData - If the extraData parameter can be passed to this.render()
+     * @returns {libwgpu} This libwgpu instance
+     */
     async initRender (enableExtraData = false) {
-        await this.#init(false, enableExtraData)
+        await this.#init()
 
         let bindGroup0Layout = libwgpu.createBindGroupLayout(this.device, "r", GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT)
         this.bindGroupLayoutList = []
@@ -56,8 +71,13 @@ class libwgpu {
 
         return this
     }
+    /**
+     * Initializes this libwgpu instance for computing (should only be called once)
+     * @param {boolean} enableExtraData - If the extraData parameter can be passed to this.compute()
+     * @returns {libwgpu} This libwgpu instance
+     */
     async initCompute (enableExtraData = false) {
-        await this.#init(true, enableExtraData)
+        await this.#init()
 
         let bindGroup0Layout = libwgpu.createBindGroupLayout(this.device, "r", GPUShaderStage.COMPUTE)
         let bindGroup1Layout = libwgpu.createBindGroupLayout(this.device, "rb", GPUShaderStage.COMPUTE)
@@ -76,16 +96,15 @@ class libwgpu {
 
         return this
     }
-    async #init (isCompute = false, enableExtraData = false) {
+    /**
+     * Initializes this libwgpu instance (used for both rendering and computing)
+     * @private
+     */
+    async #init () {
         if (!navigator.gpu) throw new Error("WebGPU API not supported. (Try enabling hardware acceleration?)")
 
-        let maxBindGroups = 0
-        if (isCompute) maxBindGroups++
-        if (enableExtraData) maxBindGroups++
         let adapter = await navigator.gpu.requestAdapter()
-        this.device = await adapter.requestDevice({
-            requiredLimits: {maxBindGroups},
-        })
+        this.device = await adapter.requestDevice()
 
         if (this.canvas != null) {
             let canvasStyle = getComputedStyle(this.canvas)
@@ -105,6 +124,12 @@ class libwgpu {
     }
 
 
+    /**
+     * Renders something to this instance's HTMLCanvasElement (passed to the constructor)
+     * @param {Float32Array} vertices - The vertices to render (a list of triangles), formatted as XYZWRGBA
+     * @param {Array} clearColor - The clear (background) color to render, formatted as RGBA
+     * @param {Float32Array} extraData - Extra data to pass to the shaders (needs to be enabled from this.initRender())
+     */
     render (vertices = new Float32Array([]), clearColor = [0, 0, 0, 0], extraData = new Float32Array([])) {
         let vertexBuffer = this.device.createBuffer({
             size: vertices.byteLength,
@@ -143,6 +168,12 @@ class libwgpu {
         vertexBuffer.destroy()
         if (extraDataBuffer != null) extraDataBuffer.destroy()
     }
+    /**
+     * Computes something
+     * @param {number} bufferSize - Size of the buffer to create (shared with the shaders)
+     * @param {Float32Array} extraData - Extra data to pass to the shaders (needs to be enabled from this.initCompute())
+     * @returns {Float32Array} The contents of the created buffer, after being processed by the shaders
+     */
     async compute (bufferSize = 1, extraData = new Float32Array([])) {
         let outputSizeBuffer = this.device.createBuffer({
             size: 1 * 4,
@@ -196,6 +227,13 @@ class libwgpu {
     }
 
 
+    /**
+     * Creates a GPUBindGroupLayout
+     * @param {GPUDevice} device - The GPUDevice to create a GPUBindGroupLayout for
+     * @param {string} typeSequence - A sequence of ("r"|"b") (meaning "read" or "both"), to set which buffer(s) in the GPUBindGroup created with this GPUBindGroupLayout are read-only or read-write
+     * @param {number} visibility - One or more of GPUShaderStage.(COMPUTE|FRAGMENT|VERTEX) (used to set the visibility/accessibility of the bind group)
+     * @returns {GPUBindGroupLayout} The created GPUBindGroupLayout
+     */
     static createBindGroupLayout (device, typeSequence = "", visibility) {
         let entries = []
         for (let i = 0; i < typeSequence.length; i++) {
@@ -211,6 +249,13 @@ class libwgpu {
         let layout = device.createBindGroupLayout({entries})
         return layout
     }
+    /**
+     * Creates a GPUBindGroup
+     * @param {GPUDevice} device - The GPUDevice to create a GPUBindGroup for
+     * @param {GPUBindGroupLayout} layout - The GPUBindGroupLayout to create a GPUBindGroup from
+     * @param {Array} buffers - An array of GPUBuffer object instances to bind to the created GPUBindGroup
+     * @returns {GPUBindGroup} The created GPUBindGroup
+     */
     static createBindGroup (device, layout, buffers) {
         let entries = []
         for (let i = 0; i < buffers.length; i++) {
@@ -226,6 +271,11 @@ class libwgpu {
         return group
     }
     
+    /**
+     * Creates a list of triangle vertices from a list of quad vertices
+     * @param {Array} vertices - A list of quad vertices, formatted as XYZWRGBA
+     * @returns {Array} A list of triangle vertices, formatted as XYZWRGBA
+     */
     static createQuadVertices (vertices) {
         let vertexList = []
         for (let i = 0; i < vertices.length; i += 8) vertexList.push(vertices.slice(i, i + 8))
