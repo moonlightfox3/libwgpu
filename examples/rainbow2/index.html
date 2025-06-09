@@ -1,0 +1,63 @@
+<!doctype html>
+<title>libwgpu rainbow 2</title>
+<style>
+    * {
+        outline: none;
+        user-select: none;
+    }
+    body, ::selection {
+        background-color: black;
+        color: lightgray;
+    }
+
+    canvas {
+        cursor: none;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        margin: 0;
+    }
+</style>
+
+<canvas id="canvas"></canvas>
+
+<script src="../../libwgpu.js"></script>
+<script>
+    let gpu = null
+    onload = async function () {
+        let style = getComputedStyle(canvas)
+        canvas.width = parseInt(style.width), canvas.height = parseInt(style.height)
+        gpu = await new libwgpu(await fetchShaders(), canvas).initRender(true)
+
+        lastFrameTime = performance.now()
+        requestAnimationFrame(tick)
+    }
+    async function fetchShaders () {
+        let resp = await fetch(`./shaders.r.wgsl`)
+        let text = await resp.text()
+        return text
+    }
+
+    let frame = 0
+    let lastFrameTime = 0
+    function tick () {
+        let currentFrameTime = performance.now()
+        let deltaTime = currentFrameTime - lastFrameTime
+        lastFrameTime = currentFrameTime
+        requestAnimationFrame(tick)
+
+        let frameDiff = deltaTime * 0.0004
+        gpu.render(new Float32Array([
+            ...libwgpu.createQuadVertices([
+                -1.0,  1.0,  0.0, 1,   0, 0, 0, 0,
+                 1.0,  1.0,  0.0, 1,   0, 0, 0, 0,
+                -1.0, -1.0,  0.0, 1,   0, 0, 0, 0,
+                 1.0, -1.0,  0.0, 1,   0, 0, 0, 0,
+            ])
+        ]), [0, 0, 0, 0], new Float32Array([frame]))
+        frame += frameDiff
+    }
+</script>
